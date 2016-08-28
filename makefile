@@ -5,7 +5,7 @@ SYS := $(shell gcc -dumpmachine)
 
 LIBFLAGS=-Llib -Bdynamic -Wl,-rpath=lib -lcairo 
 
-project1: $(OBJS)
+tsp-solver: $(OBJS)
 	g++ $(OBJS) -std=c++11 -o $@ -I/usr/include/cairo/ `pkg-config --cflags --libs gtk+-3.0` -Wall -O3 $(LIBFLAGS) -g
 	rm -f $(OBJS) *~
 src/%.o : src/%.cpp
