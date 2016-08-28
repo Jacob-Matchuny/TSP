@@ -1,8 +1,6 @@
 SOURCES=$(wildcard src/*.cpp)
 OBJS=$(SOURCES:.cpp=.o)
 
-SYS := $(shell gcc -dumpmachine)
-
 LIBFLAGS=-Llib -Bdynamic -Wl,-rpath=lib -lcairo 
 
 tsp-solver: $(OBJS)
