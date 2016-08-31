@@ -16,6 +16,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iomanip>
+#include <time.h>
 
 // Graphics
 #include <cairo.h>
@@ -29,6 +30,9 @@ struct Tour
     
     // Cost of tour (summed distances)
     float cost;
+
+    // Execution time
+    double time;
 
     // Operator for next_permutation
     bool operator<(const Tour& val) const
@@ -56,14 +60,11 @@ class DataSet
         // Generate tours from dataset
         void generateTours();
 
-        // Sort tours by cost
-        void sortTours();
-
         // Print results (best tour)
         void printResults();
 
         // Print graph
-        void printGraph(int, char**);
+        void printGraph();
 
         // Get cities
         std::vector<City> getCities() { return cities; }

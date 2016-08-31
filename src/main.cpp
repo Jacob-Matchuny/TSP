@@ -39,9 +39,9 @@ int main(int argc, char** argv)
 
     // Display resulting cheapest tour
     ds.printResults();
-  
+
     // Print graph
-    ds.printGraph(argc, argv);
+    ds.printGraph();
 
     return 0;
 }

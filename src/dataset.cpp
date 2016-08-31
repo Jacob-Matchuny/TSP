@@ -77,6 +77,7 @@ void DataSet::readInData()
 // Generate tours (BRUTE FORCE)
 void DataSet::generateTours()
 {
+    cheapestTour.time = clock();
     // Calculate all tours
     do
     {
@@ -105,6 +106,15 @@ void DataSet::generateTours()
         tourCount++;
         tour.cost = 0;
     } while(std::next_permutation(cities.begin(), cities.end()));
+
+    // Subtract current time from cheapestTour time
+    cheapestTour.time -= clock();
+
+    // Divide time by CPS to get time in secs
+    cheapestTour.time /= (double) CLOCKS_PER_SEC;
+
+    // Time is currently negative so flip sign and convert to ms
+    cheapestTour.time *= -1000;
 }
 
 // Print results
@@ -117,21 +127,23 @@ void DataSet::printResults()
     std::cout << "Tours Calculated: " << tourCount << std::endl;
 
     std::cout << std::endl;
+    std::cout << cheapestTour.tour.at(0).getA().getNum();
     for(Link link : cheapestTour.tour)
-        std::cout << "Link Joins: " << link.getA().getNum() << " " << link.getB().getNum() << "  \t$" << link.getDistance() << std::endl;
+        std::cout << "," << link.getB().getNum();
 
-    std::cout << "Cheapest Tour: " << cheapestTour.cost << std::endl;
+    std::cout << std::endl << "Cheapest Tour: " << cheapestTour.cost << std::endl;
+    std::cout << "Execution Time: " << cheapestTour.time  << " ms" << std::endl;
 }
 
 // Print graphics
-void DataSet::printGraph(int argc, char** argv)
+void DataSet::printGraph()
 {
     // Graphics vars
     GtkWidget *window;
     GtkWidget *darea;
-    
+
     // Initialize gtk window
-    gtk_init(&argc, &argv);
+    gtk_init(0, NULL);
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
     // Initialize draw area on gtk window
@@ -141,13 +153,13 @@ void DataSet::printGraph(int argc, char** argv)
     // Connect callbacks to gtk container
     g_signal_connect(G_OBJECT(darea), "draw", G_CALLBACK(on_draw_event), NULL);
     g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
-    
+
     // Setup gtk window params
     gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
     gtk_window_maximize(GTK_WINDOW(window));
     gtk_window_set_title(GTK_WINDOW(window), "Jacob Matchuny: TSP");
     gtk_widget_show_all(window);
-    
+
     // Set icon for application
     gtk_window_set_icon_from_file(GTK_WINDOW(window), "icon.png", NULL);
     
