@@ -22,6 +22,7 @@ DataSet::DataSet(std::string filename)
     this->filename = filename;
     this->tourCount = 0;
     this->cheapestTour.cost = 0;
+    this->tempTour.cost = 0;
 }
 
 // Default constructor
@@ -75,7 +76,7 @@ void DataSet::readInData()
 }
 
 // Generate tours (BRUTE FORCE)
-void DataSet::generateTours()
+void DataSet::bruteForce()
 {
     cheapestTour.time = clock();
     // Calculate all tours
@@ -124,14 +125,17 @@ void DataSet::printResults()
     std::cout << std::endl;
     std::cout << "-------- FINAL RESULTS ------" << std::endl;
     std::cout << "Cities: " << cities.size() << std::endl;
-    std::cout << "Tours Calculated: " << tourCount << std::endl;
+    std::cout << "Tours Calculated: " << tourCount << std::endl << std::endl;
 
-    std::cout << std::endl;
-    std::cout << cheapestTour.tour.at(0).getA().getNum();
+    std::cout << "----- Final Path -----" << std::endl << "[" << cheapestTour.tour.front().getA().getNum() << ",";
     for(Link link : cheapestTour.tour)
-        std::cout << "," << link.getB().getNum();
+        if(link.getA().getNum() != cheapestTour.tour.back().getA().getNum())
+            std::cout << link.getB().getNum() << ",";
+        else
+            std::cout << link.getB().getNum() << "]" << std::endl;
 
-    std::cout << std::endl << "Cheapest Tour: " << cheapestTour.cost << std::endl;
+    std::cout << "----------------------" << std::endl << std::endl;
+    std::cout << "Cheapest Tour: " << cheapestTour.cost << std::endl;
     std::cout << "Execution Time: " << cheapestTour.time  << " ms" << std::endl;
 }
 
@@ -177,16 +181,21 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data
 // Draw stuff on GTK window using cairo
 static void do_drawing(cairo_t* cr)
 {
+    int scale = 4;
+    if(ds.getCities().size() > 10)
+        scale = 5;
+
     cairo_set_source_rgb(cr, 0.8, 0.8, 0.8);
     cairo_paint(cr);
     cairo_set_source_rgb(cr, 0, 0, 0);
+    cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
 
     // Print all links
     for(Link link : ds.getCheapestTour().tour)
     {
-        cairo_move_to(cr, link.getA().getX() * 3, link.getA().getY() * 3);
-        cairo_line_to(cr, link.getB().getX() * 3, link.getB().getY() * 3);
-        cairo_stroke (cr);
+        cairo_move_to(cr, link.getA().getX() * scale, link.getA().getY() * scale);
+        cairo_line_to(cr, link.getB().getX() * scale, link.getB().getY() * scale);
+        cairo_stroke(cr);
     }
 
     // Print all cities 
@@ -194,18 +203,36 @@ static void do_drawing(cairo_t* cr)
     {
         // Create gradient for cities
         cairo_pattern_t* r1;
-        r1 = cairo_pattern_create_radial(city.getX() * 3, city.getY() * 3, 3, city.getX() * 3, city.getY() * 3, 11);  
+        r1 = cairo_pattern_create_radial(city.getX() * scale, city.getY() * scale, 3, city.getX() * scale, city.getY() * scale, 11);  
         cairo_pattern_add_color_stop_rgba(r1, 0, 1, 1, 1, 1);
         cairo_pattern_add_color_stop_rgba(r1, 1, 0.6, 0.6, 0.6, 1);
 
         // Paint city
         cairo_set_source(cr, r1);
-        cairo_arc(cr, city.getX() * 3, city.getY() * 3, 11, 0, 2*M_PI);
+        cairo_arc(cr, city.getX() * scale, city.getY() * scale, 11, 0, 2*M_PI);
         cairo_fill(cr); 
-    }
 
+        // Print city num
+        cairo_set_font_size (cr, 18.0);
+        cairo_set_source_rgb(cr, 1, 1, 1);
+
+        if(city.getNum() < 10)
+            cairo_move_to(cr, city.getX() * scale - 5.5, city.getY() * scale + 5.5);
+        else
+            cairo_move_to(cr, city.getX() * scale - 9.0, city.getY() * scale + 5.5);
+
+        std::string name = "";
+        name.append(toStrMaxDecimals(city.getNum(), 0));
+        cairo_text_path(cr, name.c_str());
+        cairo_fill_preserve(cr);
+    
+        // Border around city number
+        cairo_set_source_rgb(cr, 0, 0, 0);
+        cairo_set_line_width(cr, 0.70);
+        cairo_stroke(cr);
+    }
+    
     // Setup text format
-    cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
     cairo_set_font_size (cr, 35.0);
 
     // Setup cheapest tour string
@@ -213,15 +240,15 @@ static void do_drawing(cairo_t* cr)
     cheapestTourString.append(toStrMaxDecimals(ds.getCheapestTour().cost, 2));
 
     // Print string and format it
-    cairo_move_to (cr, 15, gdk_screen_height() - 40);
-    cairo_text_path (cr, cheapestTourString.c_str());
-    cairo_set_source_rgb (cr, 1, 1, 1);
-    cairo_fill_preserve (cr);
+    cairo_move_to (cr, 15, gdk_screen_height() - 90);
+    cairo_text_path(cr, cheapestTourString.c_str());
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_fill_preserve(cr);
 
     // Print border on string
-    cairo_set_source_rgb (cr, 0, 0, 0);
-    cairo_set_line_width (cr, 1.56);
-    cairo_stroke (cr);
+    cairo_set_source_rgb(cr, 0, 0, 0);
+    cairo_set_line_width(cr, 1.56);
+    cairo_stroke(cr);
 }
 
 // Format string to dec places provided
@@ -234,9 +261,94 @@ static std::string toStrMaxDecimals(double value, int decimals)
     std::string s = ss.str();
 
     if(decimals > 0 && s[s.find_last_not_of('0')] == '.')
-    {
         s.erase(s.size() - decimals + 1);
-    }
 
     return s;
+}
+
+// Closest edge insertion algorithm
+void DataSet::greedy()
+{
+    // Start clock
+    cheapestTour.time = clock();
+
+    // Generate greedy solution from every possible start
+    for(unsigned int i = 0; i < cities.size(); i++)
+    {
+        // Only clear after first iteration
+        tempTour.tour.clear();
+        tempTour.cost = 0;
+
+        // Reset all cities visited status
+        for(unsigned int j = 0; j < cities.size(); j++)
+            cities.at(j).setAdded(false);
+
+        // Add first edge
+        cities.at(i).setAdded(true);
+        findClosestCity(cities.at(i));
+ 
+        // Add rest of edges
+        while(!allCitiesAdded())
+            findClosestCity(tempTour.tour.back().getB());
+
+        // Push final edge
+        tempTour.tour.push_back(Link(tempTour.tour.back().getB(), cities.at(i)));
+
+        // Calculate final cost
+        for(Link link : tempTour.tour)
+            tempTour.cost += link.getDistance();
+
+        // If this tour cheaper than current cheapest, replace it
+        if(cheapestTour.cost == 0 || tempTour.cost < cheapestTour.cost)
+            cheapestTour = tempTour;
+    }
+
+    // Subtract current time from cheapestTour time
+    cheapestTour.time -= clock();
+
+    // Divide time by CPS to get time in secs
+    cheapestTour.time /= (double) CLOCKS_PER_SEC;
+
+    // Time is currently negative so flip sign and convert to ms
+    cheapestTour.time *= -1000;
+
+    // Tours calculated is city count
+    this->tourCount = cities.size();
+}
+
+// All cities added
+bool DataSet::allCitiesAdded()
+{
+    for(City city : cities)
+        if(!city.getAdded())
+            return false;
+    
+    return true;
+}
+
+// Find closest city to city
+void DataSet::findClosestCity(City c1)
+{
+    Link cheapestLink;
+    unsigned int cheapestCity = 0;
+
+    // Iterate over cities
+    for(unsigned int i = 0; i < cities.size(); i++)
+    {
+        // If this edge is cheaper, replace cheapest and its not itself
+        if(!cities.at(i).getAdded())
+        {
+            Link temp = Link(c1, cities.at(i));
+        
+            if(cheapestLink.getDistance() == -1 || temp.getDistance() < cheapestLink.getDistance())
+            {
+                cheapestLink = temp;
+                cheapestCity = i;
+            }
+        }
+    }
+
+    // Print cheapest link
+    cities.at(cheapestCity).setAdded(true);
+    tempTour.tour.push_back(cheapestLink);
 }

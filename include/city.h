@@ -31,6 +31,10 @@ class City
         unsigned int getNum() { return num; }
         void setNum(unsigned int val) { num = val; }
 
+        // Setters getters for added
+        bool getAdded() { return added; }
+        void setAdded(bool val) { added = val; }
+
         // Operator for next_permutation
         bool operator<(const City& val) const
         {
@@ -46,6 +50,9 @@ class City
 
         // Representation of city
         unsigned int num;
+
+        // If city added to graph
+        bool added;
 };
 
 #endif // CITY_H

@@ -19,6 +19,9 @@ class Link
         // Constructor
         Link(const City &a, const City &b);
 
+        // Default constructor
+        Link();
+
         // Destructor
         ~Link();
 

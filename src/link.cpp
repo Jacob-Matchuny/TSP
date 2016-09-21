@@ -17,6 +17,12 @@ Link::Link(const City &a, const City &b)
     this->distance = sqrt(x + y);
 }
 
+// Default constructor
+Link::Link()
+{
+    this->distance = -1;
+}
+
 // Deconstructor
 Link::~Link()
 {

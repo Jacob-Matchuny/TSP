@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     ds.readInData();
 
     // Calculate all possible tours
-    ds.generateTours();
+    ds.greedy();
 
     // Display resulting cheapest tour
     ds.printResults();
