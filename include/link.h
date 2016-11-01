@@ -11,6 +11,7 @@
 
 // Extern includes
 #include <cmath>
+#include <iostream>
 
 // Link - Holds information about link between cities including euclidian distance
 class Link
@@ -25,18 +26,6 @@ class Link
         // Destructor
         ~Link();
 
-        // Getters for city a
-        City getA() { return a; }
-        void setA(City val) { a = val; }
-
-        // Getters for city b
-        City getB() { return b; }
-
-        // Setters getters for distance
-        float getDistance() { return distance; }
-        void getDistance(float val) { distance = val; }
- 
-    private:
         // First city
         City a;
 
@@ -45,6 +34,15 @@ class Link
 
         // Euclidian distance from a -> b
         float distance;
+
+        // Dist
+        void dist(const City&, const City&);
+
+        // Operator for find
+        bool operator< (const Link& l) 
+        {
+            return (l.distance < distance);
+        }
 };
 
 #endif // LINK_H

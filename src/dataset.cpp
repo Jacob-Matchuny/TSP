@@ -23,6 +23,8 @@ DataSet::DataSet(std::string filename)
     this->tourCount = 0;
     this->cheapestTour.cost = 0;
     this->tempTour.cost = 0;
+    this->popSize = 150;
+    this->mutateFactor = 0.15;
 }
 
 // Default constructor
@@ -50,7 +52,7 @@ void DataSet::readInData()
     // If file valid, parse
     if(file.good())
     {
-        std::cout << "Reading from: " << filename << std::endl;
+        std::cout << "Reading from: " << filename << std::endl << std::endl;
 
         while(!file.eof())
         {
@@ -75,8 +77,8 @@ void DataSet::readInData()
     file.close();
 }
 
-// Generate tours (BRUTE FORCE)
-void DataSet::bruteForce()
+// Brute force to generate tours
+void DataSet::brute()
 {
     cheapestTour.time = clock();
     // Calculate all tours
@@ -92,12 +94,12 @@ void DataSet::bruteForce()
             tour.tour.push_back(Link(cities.at(i), cities.at(i + 1)));
 
             // Adjust cost
-            tour.cost += tour.tour.at(i).getDistance();
+            tour.cost += tour.tour.at(i).distance;
         }
 
         // Generate link to first city
         tour.tour.push_back(Link(cities.back(), cities.front()));
-        tour.cost += tour.tour.back().getDistance();
+        tour.cost += tour.tour.back().distance;
 
         // Adjust cheapest cost if need be
         if(tour.cost < cheapestTour.cost || cheapestTour.cost == 0)
@@ -127,16 +129,20 @@ void DataSet::printResults()
     std::cout << "Cities: " << cities.size() << std::endl;
     std::cout << "Tours Calculated: " << tourCount << std::endl << std::endl;
 
-    std::cout << "----- Final Path -----" << std::endl << "[" << cheapestTour.tour.front().getA().getNum() << ",";
-    for(Link link : cheapestTour.tour)
-        if(link.getA().getNum() != cheapestTour.tour.back().getA().getNum())
-            std::cout << link.getB().getNum() << ",";
-        else
-            std::cout << link.getB().getNum() << "]" << std::endl;
+    std::cout << "----- Final Path -----" << std::endl << "[ " << cheapestTour.tour.front().a.num << " ";
+    for(auto & link : cheapestTour.tour)
+        std::cout << link.b.num << " ";
+    std::cout << "]" << std::endl;
 
     std::cout << "----------------------" << std::endl << std::endl;
-    std::cout << "Cheapest Tour: " << cheapestTour.cost << std::endl;
-    std::cout << "Execution Time: " << cheapestTour.time  << " ms" << std::endl;
+    std::cout << "Cheapest Tour: " << cheapestTour.cost << " ";
+    std::cout << "Execution Time: " << cheapestTour.time << std::endl;
+
+    if(!algorithm.compare("genetic"))
+    {
+        std::cout << "Mutations: " << mutateCount << std::endl;
+        std::cout << "Generations: " << genCount << std::endl;
+    }
 }
 
 // Print graphics
@@ -182,7 +188,7 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data
 static void do_drawing(cairo_t* cr)
 {
     int scale = 4;
-    if(ds.getCities().size() > 10)
+    if(ds.cities.size() > 10)
         scale = 5;
 
     cairo_set_source_rgb(cr, 0.8, 0.8, 0.8);
@@ -191,38 +197,38 @@ static void do_drawing(cairo_t* cr)
     cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
 
     // Print all links
-    for(Link link : ds.getCheapestTour().tour)
+    for(auto & link : ds.cheapestTour.tour)
     {
-        cairo_move_to(cr, link.getA().getX() * scale, link.getA().getY() * scale);
-        cairo_line_to(cr, link.getB().getX() * scale, link.getB().getY() * scale);
+        cairo_move_to(cr, link.a.x * scale, link.a.y * scale);
+        cairo_line_to(cr, link.b.x * scale, link.b.y * scale);
         cairo_stroke(cr);
     }
 
     // Print all cities 
-    for(City city : ds.getCities())
+    for(auto & city : ds.cities)
     {
         // Create gradient for cities
         cairo_pattern_t* r1;
-        r1 = cairo_pattern_create_radial(city.getX() * scale, city.getY() * scale, 3, city.getX() * scale, city.getY() * scale, 11);  
+        r1 = cairo_pattern_create_radial(city.x * scale, city.y * scale, 3, city.x * scale, city.y * scale, 11);  
         cairo_pattern_add_color_stop_rgba(r1, 0, 1, 1, 1, 1);
         cairo_pattern_add_color_stop_rgba(r1, 1, 0.6, 0.6, 0.6, 1);
 
         // Paint city
         cairo_set_source(cr, r1);
-        cairo_arc(cr, city.getX() * scale, city.getY() * scale, 11, 0, 2*M_PI);
+        cairo_arc(cr, city.x * scale, city.y * scale, 11, 0, 2*M_PI);
         cairo_fill(cr); 
 
         // Print city num
         cairo_set_font_size (cr, 18.0);
         cairo_set_source_rgb(cr, 1, 1, 1);
 
-        if(city.getNum() < 10)
-            cairo_move_to(cr, city.getX() * scale - 5.5, city.getY() * scale + 5.5);
+        if(city.num < 10)
+            cairo_move_to(cr, city.x * scale - 5.5, city.y * scale + 5.5);
         else
-            cairo_move_to(cr, city.getX() * scale - 9.0, city.getY() * scale + 5.5);
+            cairo_move_to(cr, city.x * scale - 9.0, city.y * scale + 5.5);
 
         std::string name = "";
-        name.append(toStrMaxDecimals(city.getNum(), 0));
+        name.append(toStrMaxDecimals(city.num, 0));
         cairo_text_path(cr, name.c_str());
         cairo_fill_preserve(cr);
     
@@ -235,9 +241,15 @@ static void do_drawing(cairo_t* cr)
     // Setup text format
     cairo_set_font_size (cr, 35.0);
 
+    // Setup spacer and algorithm strings
+    std::string spacer = "                   ";
+    std::transform(ds.algorithm.begin(), ds.algorithm.end(), ds.algorithm.begin(), toupper);
+    
     // Setup cheapest tour string
-    std::string cheapestTourString = "Cheapest Tour: ";
-    cheapestTourString.append(toStrMaxDecimals(ds.getCheapestTour().cost, 2));
+    std::string cheapestTourString = "Algorithm: " + ds.algorithm;
+    cheapestTourString.append(spacer + "File: " + ds.filename);
+    cheapestTourString.append(spacer + "Cost: " + toStrMaxDecimals(ds.cheapestTour.cost, 2));
+    cheapestTourString.append(spacer + "Runtime: " + toStrMaxDecimals(ds.cheapestTour.time, 2) + " ms");
 
     // Print string and format it
     cairo_move_to (cr, 15, gdk_screen_height() - 90);
@@ -266,7 +278,7 @@ static std::string toStrMaxDecimals(double value, int decimals)
     return s;
 }
 
-// Closest edge insertion algorithm
+// Nearest neighbor algorithm
 void DataSet::greedy()
 {
     // Start clock
@@ -281,22 +293,22 @@ void DataSet::greedy()
 
         // Reset all cities visited status
         for(unsigned int j = 0; j < cities.size(); j++)
-            cities.at(j).setAdded(false);
+            cities.at(j).added = false;
 
         // Add first edge
-        cities.at(i).setAdded(true);
+        cities.at(i).added = true;
         findClosestCity(cities.at(i));
  
         // Add rest of edges
         while(!allCitiesAdded())
-            findClosestCity(tempTour.tour.back().getB());
+            findClosestCity(tempTour.tour.back().b);
 
         // Push final edge
-        tempTour.tour.push_back(Link(tempTour.tour.back().getB(), cities.at(i)));
+        tempTour.tour.push_back(Link(tempTour.tour.back().b, cities.at(i)));
 
         // Calculate final cost
-        for(Link link : tempTour.tour)
-            tempTour.cost += link.getDistance();
+        for(auto & link : tempTour.tour)
+            tempTour.cost += link.distance;
 
         // If this tour cheaper than current cheapest, replace it
         if(cheapestTour.cost == 0 || tempTour.cost < cheapestTour.cost)
@@ -319,8 +331,8 @@ void DataSet::greedy()
 // All cities added
 bool DataSet::allCitiesAdded()
 {
-    for(City city : cities)
-        if(!city.getAdded())
+    for(auto & city : cities)
+        if(!city.added)
             return false;
     
     return true;
@@ -336,11 +348,11 @@ void DataSet::findClosestCity(City c1)
     for(unsigned int i = 0; i < cities.size(); i++)
     {
         // If this edge is cheaper, replace cheapest and its not itself
-        if(!cities.at(i).getAdded())
+        if(!cities.at(i).added)
         {
             Link temp = Link(c1, cities.at(i));
         
-            if(cheapestLink.getDistance() == -1 || temp.getDistance() < cheapestLink.getDistance())
+            if(cheapestLink.distance == -1 || temp.distance < cheapestLink.distance)
             {
                 cheapestLink = temp;
                 cheapestCity = i;
@@ -349,6 +361,333 @@ void DataSet::findClosestCity(City c1)
     }
 
     // Print cheapest link
-    cities.at(cheapestCity).setAdded(true);
+    cities.at(cheapestCity).added = true;
     tempTour.tour.push_back(cheapestLink);
+}
+
+// Genetic algorithm
+void DataSet::genetic()
+{
+    // Start clock
+    std::srand(std::time(0));
+    cheapestTour.time = clock();
+
+    // Initialize Population
+    initPop();
+
+    // Repeat gen times
+    while(population.at(0).cost > 830)
+    {
+        // Sort pop
+        sortPop();
+
+        // Crossover random parents, prune weakest
+        crossPop();
+
+        // Mutate according to mutateFactor
+        mutatePop();
+
+        // Update gen count
+        genCount++;
+    
+        std::cout << "\rCHEAPEST: " << population.at(0).cost;
+    }
+
+    // Final sort
+    sortPop();
+
+    // Make fittest individual in population our solution
+    cheapestTour = population.at(0);
+
+    // Subtract current time from cheapestTour time
+    cheapestTour.time -= clock();
+
+    // Divide time by CPS to get time in secs
+    cheapestTour.time /= (double) CLOCKS_PER_SEC;
+
+    // Time is currently negative so flip sign and convert to ms
+    cheapestTour.time *= -1000;
+}
+
+// Initializes population for GA
+void DataSet::initPop()
+{
+
+    // Generate greedy solution from every possible start
+    for(unsigned int i = 0; i < cities.size(); i++)
+    {
+        // Only clear after first iteration
+        tempTour.tour.clear();
+        tempTour.cost = 0;
+
+        // Reset all cities visited status
+        for(unsigned int j = 0; j < cities.size(); j++)
+            cities.at(j).added = false;
+
+        // Add first edge
+        cities.at(i).added = true;
+        findClosestCity(cities.at(i));
+ 
+        // Add rest of edges
+        while(!allCitiesAdded())
+            findClosestCity(tempTour.tour.back().b);
+
+        // Push final edge
+        tempTour.tour.push_back(Link(tempTour.tour.back().b, cities.at(i)));
+
+        // Calculate final cost
+        for(auto & link : tempTour.tour)
+            tempTour.cost += link.distance;
+
+        population.push_back(tempTour);
+    }
+
+    unsigned int remaining = popSize - cities.size();
+    Tour temp;
+    for(unsigned int i = 0; i < remaining; i++)
+    {
+        temp.tour.clear();
+        temp.cost = 0;
+        std::random_shuffle(cities.begin(), cities.end());
+        for(unsigned int j = 0; j < cities.size() - 1; j++)
+            temp.tour.push_back(Link(cities.at(j), cities.at(j+1)));
+
+        temp.tour.push_back(Link(temp.tour.back().b, cities.at(0)));
+
+        for(Link link : temp.tour)
+            temp.cost += link.distance;
+
+        population.push_back(temp);
+    }
+}
+
+// Prints population
+void DataSet::printPop()
+{
+    int i = 0;
+    for(auto & tour : population)
+    {
+        std::cout << std::setfill('0') << std::setw(3) << i << ") [ " << tour.tour.at(0).a.num << " ";
+
+        // Print links from tour
+        for(auto & link : tour.tour)
+            std::cout << link.b.num << " ";
+
+        std::cout << "]: $" << toStrMaxDecimals(tour.cost, 2) << std::endl;
+        i++;
+    }
+}
+
+// Sort population
+void DataSet::sortPop()
+{
+    // Standard sort
+    std::sort(population.begin(), population.end());
+}
+
+// Crossover population
+void DataSet::crossPop()
+{
+    int rand1, rand2;
+    int children = 3;
+
+    // Kill off weakest parents
+    population.resize(population.size() - children);
+    for(int i = 0; i < children; i++)
+    {
+        rand1 = rand() % popSize % (population.size() - 1);
+
+        rand2 = rand() % (population.size() - 1);
+        while(rand2 == rand1)
+            rand2 = rand() % (population.size() - 1);
+
+        Tour child = crossover(population.at(rand1), population.at(rand2));
+
+        // Assimilate children into population
+        population.push_back(child);
+    }
+}
+
+// Mutate population (according to mutate factor
+void DataSet::mutatePop()
+{
+    if(mutate == 1)
+    {
+        // If random value falls within mutateFactor
+        if(((double) rand() / RAND_MAX) < mutateFactor)
+        {
+            int popIndex = rand() %  population.size();
+            int cityIndex1 = (rand() % (cities.size() - 2)) + 1;
+
+            int cityIndex2 = (rand() % (cities.size() - 2)) + 1;
+            while(cityIndex2 == cityIndex1)
+                cityIndex2 = (rand() % (cities.size() - 2)) + 1;
+            
+            // Swap
+            City temp = population.at(popIndex).tour.at(cityIndex1).b;
+            City temp2 = population.at(popIndex).tour.at(cityIndex2).b;
+            population.at(popIndex).tour.at(cityIndex1).b = population.at(popIndex).tour.at(cityIndex2).b;
+            population.at(popIndex).tour.at(cityIndex2).b = temp;
+
+            // Repair
+            population.at(popIndex).tour.at(cityIndex2 + 1).a = temp;
+            population.at(popIndex).tour.at(cityIndex1 + 1).a = temp2;
+
+            // Update cost
+            population.at(popIndex).cost = 0.0;
+            for(unsigned int i = 0; i < cities.size(); i++)
+                population.at(popIndex).tour.at(i).dist(population.at(popIndex).tour.at(i).a, population.at(popIndex).tour.at(i).b);
+            
+            for(Link link : population.at(popIndex).tour)
+                population.at(popIndex).cost += link.distance;
+
+            mutateCount++;
+        }
+    }
+    else if(mutate == 2)
+    {
+        // If random value falls within mutateFactor
+        if(((double) rand() / RAND_MAX) < mutateFactor)
+        {
+            int popIndex = rand() %  population.size();
+            int cityIndex = (rand() % (cities.size() - 2)) + 1;
+            
+            // Swap
+            City temp = population.at(popIndex).tour.at(0).a;
+            population.at(popIndex).tour.at(0).a = population.at(popIndex).tour.at(cityIndex).b;
+            population.at(popIndex).tour.at(cityIndex).b = temp;
+
+            // Repair
+            population.at(popIndex).tour.at(cityIndex + 1).a = temp;
+            population.at(popIndex).tour.back().b = population.at(popIndex).tour.front().a;
+
+            // Update cost
+            population.at(popIndex).cost = 0.0;
+            for(unsigned int i = 0; i < cities.size(); i++)
+                population.at(popIndex).tour.at(i).dist(population.at(popIndex).tour.at(i).a, population.at(popIndex).tour.at(i).b);
+            
+            for(Link link : population.at(popIndex).tour)
+                population.at(popIndex).cost += link.distance;
+
+            mutateCount++;
+        }
+    }
+}
+
+// Crossover population helper
+Tour DataSet::crossover(const Tour& parent1, const Tour& parent2)
+{
+    // Child
+    Tour child;
+    child.cost = 0;
+ 
+    if(cross == 1)
+    {
+        City children[cities.size()];
+        bool childSpots[cities.size()] = { false };
+        for(unsigned int i = 0; i < cities.size(); i++)
+        {
+            // Alternate parents, Grab from parent 2 if we can
+            if(i % 2 && !childSpots[parent2.tour.at(i).a.num - 1])
+            {
+                childSpots[parent2.tour.at(i).a.num - 1] = true;
+                children[i] = parent2.tour.at(i).a;
+            }
+            // Grab from parent 1 if we can
+            else if(!childSpots[parent1.tour.at(i).a.num - 1])
+            {
+                childSpots[parent1.tour.at(i).a.num - 1] = true;
+                children[i] = parent1.tour.at(i).a;
+            }
+            else
+            {   
+                for(unsigned int j = 0; j < cities.size(); j++)
+                {
+                    if(!childSpots[cities.at(j).num - 1])
+                    {
+                        children[i] = cities.at(j);
+                        childSpots[cities.at(j).num - 1] = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Create tour
+        for(unsigned int i = 0; i < cities.size() - 1; i++)
+            child.tour.push_back(Link(children[i], children[i+1]));
+
+        // Add final edge
+        child.tour.push_back(Link(child.tour.back().b, child.tour.front().a));
+
+        // Calculate cost
+        for(Link link : child.tour)
+            child.cost += link.distance;
+        
+        return child;
+    }
+    else if(cross == 2)
+    {
+        std::vector<City> citylist;
+    
+        if((rand() % 2) == 0)
+            citylist.push_back(parent1.tour.at(0).a);
+        else
+            citylist.push_back(parent2.tour.at(0).a);
+
+        // Greedy crossover
+        for(unsigned int i = 1; i < cities.size(); i++)
+        {
+            Link l1 = Link(citylist[i - 1], parent1.tour.at(i).a);
+            Link l2 = Link(citylist[i - 1], parent2.tour.at(i).a);
+
+            // Pick l1
+            if(std::find(citylist.begin(), citylist.end(), parent1.tour.at(i).a) == citylist.end() && l1.distance > 0)
+            {
+                citylist.push_back(parent1.tour.at(i).a);
+            }
+            // Else l2
+            else if(std::find(citylist.begin(), citylist.end(), parent2.tour.at(i).a) == citylist.end() && l2.distance != 0)
+            {
+                citylist.push_back(parent2.tour.at(i).a);
+            }
+            // Else grab next unvisited city
+            else
+            {
+                for(unsigned int i = 0; i < cities.size(); i++)
+                {
+                    if(std::find(citylist.begin(), citylist.end(), parent1.tour.at(i).a) == citylist.end())
+                    {
+                        citylist.push_back(parent1.tour.at(i).a);
+                        break;
+                    }
+                    else if(std::find(citylist.begin(), citylist.end(), parent2.tour.at(i).a) == citylist.end())
+                    {
+                        citylist.push_back(parent2.tour.at(i).a);
+                        break;
+                    }
+                    
+                }
+            }
+        }
+
+        // Build tour
+        for(unsigned int i = 0; i < cities.size() - 1; i++)
+            child.tour.push_back(Link(citylist.at(i), citylist.at(i+1)));
+    
+        // Add final edge
+        child.tour.push_back(Link(child.tour.back().b, child.tour.front().a));
+
+        // Update cost
+        for(Link link : child.tour)
+            child.cost += link.distance;
+        
+        // Reset visited status
+        for(unsigned int i = 0; i < cities.size(); i++)
+            cities.at(i).added = false;
+
+        return child;
+    }
+
+    return child;
 }

@@ -16,12 +16,13 @@
 #include "link.h"
 
 // Extern includes
+#include <iostream>
 #include <vector>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <iomanip>
-#include <time.h>
+#include <ctime>
 
 // Graphics
 #include <cairo.h>
@@ -50,6 +51,7 @@ struct Tour
 class DataSet
 {
     public:
+        // ------ GENERAL ------
         // Constructor
         DataSet(std::string);
 
@@ -59,43 +61,27 @@ class DataSet
         // Destructor
         ~DataSet();
 
+        // Algorithm used
+        std::string algorithm;
+        
+        // Filename to open
+        std::string filename;
+        
+        // List of cities from file
+        std::vector<City> cities;
+
         // Read in cities / generate links
         void readInData();
-
-        // Brute force tours
-        void bruteForce();
-
-        // Closest edge tours
-        void greedy();
-
+        
         // Print results (best tour)
         void printResults();
 
         // Print graph
         void printGraph();
-
-        // Get cities
-        std::vector<City> getCities() { return cities; }
-
-        // Get cheapestTour
-        Tour getCheapestTour() { return cheapestTour; }
-
-        // Get closest city to city
-        void findClosestCity(City c1);
-
-        // Check if all cities are added to graph
-        bool allCitiesAdded();
-
+        
         // Do the drawing with cairo
         void do_drawing(cairo_t*);
- 
-    private:
-        // Filename to open
-        std::string filename;
-
-        // List of cities from file
-        std::vector<City> cities;
-
+        
         // Cheapest tour currently calculated
         Tour cheapestTour;
 
@@ -104,6 +90,67 @@ class DataSet
 
         // Number of tours calculated
         long int tourCount;
+        // ---------------------
+
+
+        // ------ BRUTE ------
+        void brute();
+        // -------------------
+
+
+        // ------ GREEDY ------
+        void greedy();
+
+        // Get closest city to city
+        void findClosestCity(City c1);
+
+        // Check if all cities are added to graph
+        bool allCitiesAdded();
+        // --------------------
+
+
+        // ------ GENETIC ------
+        void genetic();
+        
+        // Population for GA
+        std::vector<Tour> population;
+        
+        // Population size for GA
+        unsigned int popSize;
+
+        // Generation count
+        unsigned int genCount;
+
+        // Mutation factor
+        double mutateFactor;
+
+        // Initialize population for GA
+        void initPop();
+
+        // Print population for GA
+        void printPop();
+
+        // Sort population
+        void sortPop();
+
+        // Mutate population
+        void mutatePop();
+        
+        // Crossover population
+        void crossPop();
+
+        // Crossover population helper
+        Tour crossover(const Tour&, const Tour&);
+
+        // Crossover function to pick
+        int cross;
+
+        // Mutation function to pick
+        int mutate;
+
+        // Mutation count
+        int mutateCount;
+        // ---------------------
 };
 
 #endif // DATASET_H
