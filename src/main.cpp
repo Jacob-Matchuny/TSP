@@ -45,6 +45,7 @@ void help()
     std::cout << "<args>      : brute   : NONE" << std::endl;
     std::cout << "            : greedy  : NONE" << std::endl;
     std::cout << "            : genetic : <crossover> <mutator> " << std::endl;
+    std::cout << "            : wisdom  : <crossover> <mutator> " << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
 }
 
@@ -82,6 +83,16 @@ void parseArgs(int argc, char** argv)
                 ds.cross = atoi(argv[3]);
                 ds.mutate = atoi(argv[4]);
                 ds.genetic();
+                rc = 0;
+            }
+        }
+        else if(ds.algorithm.compare("wisdom") == 0)
+        {
+            if(argc > 4)
+            {
+                ds.cross = atoi(argv[3]);
+                ds.mutate = atoi(argv[4]);
+                ds.wisdom();
                 rc = 0;
             }
         }

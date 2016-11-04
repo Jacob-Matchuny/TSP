@@ -369,14 +369,14 @@ void DataSet::findClosestCity(City c1)
 void DataSet::genetic()
 {
     // Start clock
-    std::srand(std::time(0));
-    cheapestTour.time = clock();
+    //std::srand(std::time(0));
+    //cheapestTour.time = clock();
 
     // Initialize Population
     initPop();
 
     // Repeat gen times
-    while(population.at(0).cost > 830)
+    while(genCount < 200000)
     {
         // Sort pop
         sortPop();
@@ -389,30 +389,27 @@ void DataSet::genetic()
 
         // Update gen count
         genCount++;
-    
-        std::cout << "\rCHEAPEST: " << population.at(0).cost;
     }
 
     // Final sort
     sortPop();
 
     // Make fittest individual in population our solution
-    cheapestTour = population.at(0);
+    //cheapestTour = population.at(0);
 
     // Subtract current time from cheapestTour time
-    cheapestTour.time -= clock();
+    //cheapestTour.time -= clock();
 
     // Divide time by CPS to get time in secs
-    cheapestTour.time /= (double) CLOCKS_PER_SEC;
+    //cheapestTour.time /= (double) CLOCKS_PER_SEC;
 
     // Time is currently negative so flip sign and convert to ms
-    cheapestTour.time *= -1000;
+    //cheapestTour.time *= -1000;
 }
 
 // Initializes population for GA
 void DataSet::initPop()
 {
-
     // Generate greedy solution from every possible start
     for(unsigned int i = 0; i < cities.size(); i++)
     {
@@ -442,7 +439,10 @@ void DataSet::initPop()
         population.push_back(tempTour);
     }
 
-    unsigned int remaining = popSize - cities.size();
+    unsigned int remaining = 0;
+    if(cities.size() < popSize)
+        remaining = popSize - cities.size();
+
     Tour temp;
     for(unsigned int i = 0; i < remaining; i++)
     {
@@ -690,4 +690,105 @@ Tour DataSet::crossover(const Tour& parent1, const Tour& parent2)
     }
 
     return child;
+}
+
+// Wisdom of crowds
+void DataSet::wisdom()
+{
+    // Get time
+    std::srand(std::time(0));
+    cheapestTour.time = clock();
+
+    unsigned int expertCount = 10;
+    unsigned int adjacency[expertCount][cities.size()] = { 0 };
+    unsigned int frequency[cities.size()][cities.size()] = { 0 };
+    std::vector<unsigned int> max;
+    std::vector<Tour> experts;
+
+    // Get our experts
+    for(unsigned int i = 0; i < expertCount; i++)
+    {
+        population.clear();
+        genetic();
+        experts.push_back(population.at(0));
+        std::cout << "E" << std::setw(2) << std::setfill('0') << i + 1 << ": " << population.at(0).cost << std::endl;
+        genCount = 0;
+    }
+    std::cout << std::endl;
+
+    // Get adjacency matrix
+    for(unsigned int i = 0; i < experts.size(); i++)
+        for(unsigned int j = 0; j < cities.size(); j++)
+            adjacency[i][j] = experts.at(i).tour.at(j).a.num;
+
+    // Get frequency matrix
+    for(unsigned int position = 0; position < cities.size(); position++)
+    {
+        for(unsigned int city = 0; city < cities.size(); city++)
+        {
+            unsigned int sum = 0;
+            frequency[position][city] = 0;
+            for(unsigned int expert = 0; expert < experts.size(); expert++)
+            {   
+                if(adjacency[expert][position] == city + 1)
+                {
+                    sum++;
+                }
+            }
+
+            frequency[position][city] = sum;
+        }
+    }
+
+    // Get maximum matrix
+    for(unsigned int i = 0; i < cities.size(); i++)
+    {
+        int maxindex = -1;
+        unsigned int maximum = 0;
+        for(unsigned int j = 0; j < cities.size(); j++)
+        {
+            if(std::find(max.begin(), max.end(), j) == max.end() && frequency[i][j] > maximum)
+            {
+                maximum = frequency[i][j];
+                maxindex = j;
+            }
+        }
+
+        if(maxindex == -1)
+        {
+            for(unsigned int j = 0; j < cities.size(); j++)
+            {
+                if(std::find(max.begin(), max.end(), cities.at(j).num) == max.end())
+                {
+                    maxindex = cities.at(j).num;
+                    break;
+                }
+            }
+        }
+    
+        std::cout << maxindex << " ";
+        max.push_back(maxindex);
+    }
+
+    // Build tour
+    std::sort(cities.begin(), cities.end());
+    cheapestTour.tour.clear();
+    for(unsigned int i = 0; i < cities.size() - 1; i++)
+        cheapestTour.tour.push_back(Link(cities.at(max[i]), cities.at(max[i+1])));
+
+    // Add final edge
+    cheapestTour.tour.push_back(Link(cheapestTour.tour.back().b, cheapestTour.tour.front().a));
+
+    // Update cost
+    for(Link link: cheapestTour.tour)
+        cheapestTour.cost += link.distance;
+
+    // Subtract current time from cheapestTour time
+    cheapestTour.time -= clock();
+
+    // Divide time by CPS to get time in secs
+    cheapestTour.time /= (double) CLOCKS_PER_SEC;
+
+    // Time is currently negative so flip sign and convert to ms
+    cheapestTour.time *= -1000;
 }

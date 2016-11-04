@@ -151,6 +151,11 @@ class DataSet
         // Mutation count
         int mutateCount;
         // ---------------------
+        
+
+        // ----- WISDOM OF CROWDS -----
+        void wisdom();
+        // ----------------------------
 };
 
 #endif // DATASET_H
